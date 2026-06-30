@@ -1,4 +1,3 @@
-
 # 4. System Analysis & Design
 
 ## 4.1 Problem Statement & Objectives
@@ -7,7 +6,7 @@
 The current travel and tourism industry suffers from fragmentation. Travelers must use multiple decentralized platforms to book flights, reserve hotel rooms, and hire local tour guides. This lack of integration leads to a poor user experience, complicated payment processes, and difficulty in managing comprehensive travel itineraries.
 
 ### Objectives
-The objective is to design and develop **Osiris**, a centralized, multi-module unified travel platform. The system aims to integrate Airlines, Hotels, and Tour Guides into a single ecosystem, providing a seamless booking experience, centralized wallet management, and a unified authentication system for all stakeholders.
+The objective is to design and develop **stayFly**, a centralized, multi-module unified travel platform. The system aims to integrate Airlines, Hotels, and Tour Guides into a single ecosystem, providing a seamless booking experience, centralized wallet management, and a unified authentication system for all stakeholders.
 
 ### 4.1.1 Use Case Diagram & Descriptions
 
@@ -21,7 +20,7 @@ flowchart LR
     SA((System Admin))
 
     %% Use Cases
-    subgraph Osiris Platform Ecosystem
+    subgraph stayFly Platform Ecosystem
         UC1([Search & Book Flights])
         UC2([Search & Book Hotels])
         UC3([Hire Tour Guides])
@@ -71,61 +70,151 @@ flowchart LR
 
 ### 4.1.3 Software Architecture
 
-The Osiris system is built utilizing a **Modular Monolithic N-Tier Architecture** on top of the `.NET 8` framework.
+The stayFly system is built utilizing a **Modular Monolithic N-Tier Architecture** on top of the `.NET 8` framework.
 
 * **Presentation Layer:** ASP.NET Core MVC (Controllers & Razor Views).
 * **Business Logic Layer:** Encapsulates domain rules for each module independently.
 * **Data Access Layer (DAL):** Utilizes **Entity Framework Core** (Code-First) with `ApplicationDbContext`.
 
----
+# 4.2 Database Design & Data Modeling (Detailed Schema)
 
-## 4.2 Database Design & Data Modeling
+## 4.2.1 Detailed ERD per Module
 
-### 4.2.1 ER Diagram (Entity-Relationship Diagram)
-
+### Module 1: Auth & User Core
 ```mermaid
 erDiagram
-    %% Core Auth & User
     USER {
         long Id PK
-        string Role
+        string UserName
+        string Name
+        string Email
+        string PasswordHash
         decimal WalletBalance
+        string Role
+        string Status
     }
-    REFRESH_TOKEN }o--|| USER : owns
-    WALLET_TRANSACTION }o--|| USER : performs
-
-    %% Hotel Module
-    HOTEL ||--|| HOTEL_POLICY : enforces
-    HOTEL ||--o{ HOTEL_ROOM : contains
-    HOTEL ||--o{ HOTEL_BOOKING : receives
-    USER ||--o{ HOTEL_BOOKING : makes
-    HOTEL_BOOKING ||--|{ HOTEL_BOOKING_ROOM : reserves
-
-    %% Airline Module
-    AIRLINE ||--o{ FLIGHT : operates
-    FLIGHT ||--o{ FLIGHT_SEGMENT : consists_of
-    USER ||--o{ AIRLINE_BOOKING : makes
-    AIRLINE_BOOKING }o--|| FLIGHT : reserves
-    AIRLINE_BOOKING ||--|{ PASSENGER : includes
-
-    %% Tour Guide Module
-    TOUR_GUIDE ||--o{ TOUR : offers
-    USER ||--|| TOUR_GUIDE : acts_as
-    USER ||--o{ TOUR_BOOKING : makes
-    TOUR_BOOKING }o--|| TOUR : books
-    TOUR_BOOKING ||--|{ TOUR_BOOKING_PARTICIPANT : includes
+    WALLET_TRANSACTION {
+        long Id PK
+        long UserId FK
+        decimal Amount
+        string Type
+        string Description
+        DateTime CreatedAt
+    }
+    USER ||--o{ WALLET_TRANSACTION : owns
 
 ```
 
-### 4.2.2 Logical & Physical Schema
+### Module 2: Hotels Module
 
-The relational database is highly normalized to the **3rd Normal Form (3NF)**.
+```mermaid
+erDiagram
+    HOTEL {
+        long Id PK
+        long UserId FK
+        string HotelName
+        bool Verified
+        int StarRating
+        string CityArea
+    }
+    HOTEL_ROOM {
+        long Id PK
+        long HotelId FK
+        string RoomName
+        decimal Price
+        int Quantity
+    }
+    HOTEL_BOOKING {
+        long Id PK
+        long UserId FK
+        long HotelId FK
+        DateTime CheckInDate
+        decimal TotalPrice
+        string Status
+    }
+    HOTEL ||--o{ HOTEL_ROOM : contains
+    HOTEL ||--o{ HOTEL_BOOKING : receives
+    USER ||--o{ HOTEL_BOOKING : makes
 
-* **Naming Conventions:** Tables are prefixed (`hotel_`, `airline_`, `tourguide_`) to logically group schema objects within the single `ApplicationDbContext`.
-* **Keys & Relationships:** `BIGINT` is used for all Primary Keys. Strict Foreign Key constraints (`DeleteBehavior.Restrict` vs `Cascade`) are applied based on domain logic.
-* **Data Types Optimization:** Financial amounts (`Price`, `WalletBalance`) use `decimal(18,2)` to prevent floating-point precision errors. Dates use `DateTime2`.
+```
+
+### Module 3: Airline Module
+
+```mermaid
+erDiagram
+    AIRLINE {
+        long Id PK
+        string Name
+        string Country
+        bool Verified
+    }
+    FLIGHT {
+        long Id PK
+        long AirlineId FK
+        string FlightNumber
+        string DepartureAirportCode
+        string ArrivalAirportCode
+        decimal Price
+        int AvailableSeats
+    }
+    BOOKING {
+        long Id PK
+        long UserId FK
+        long FlightId FK
+        int NumberOfSeats
+        decimal TotalPrice
+        string Status
+    }
+    AIRLINE ||--o{ FLIGHT : operates
+    FLIGHT ||--o{ BOOKING : has
+    USER ||--o{ BOOKING : makes
+
+```
+
+### Module 4: TourGuide Module
+
+```mermaid
+erDiagram
+    TOUR_GUIDE {
+        long Id PK
+        long UserId FK
+        string Name
+        string Bio
+        string LicenseId
+        string Status
+    }
+    TOUR {
+        long Id PK
+        long TourGuideId FK
+        string TourTitle
+        decimal BasePriceUsd
+        int DurationHours
+    }
+    TOUR_BOOKING {
+        long Id PK
+        long UserId FK
+        long TourId FK
+        int ParticipantsCount
+        decimal TotalPrice
+        string Status
+    }
+    TOUR_GUIDE ||--o{ TOUR : creates
+    TOUR ||--o{ TOUR_BOOKING : receives
+    USER ||--o{ TOUR_BOOKING : makes
+
+```
 
 ---
+
+## 4.2.2 Data Dictionary (Key Schema)
+
+| Table | Column | Type | Constraints |
+| --- | --- | --- | --- |
+| **User** | `WalletBalance` | `decimal(18,2)` | `Default 0` |
+| **Flight** | `FlightNumber` | `string` | `Nullable` |
+| **Tour** | `BasePriceUsd` | `decimal(18,2)` | `Required` |
+| **HotelRoom** | `Price` | `decimal(18,2)` | `Required` |
+| **Booking** | `Status` | `string` | `Pending/Approved` |
 
 ## 4.3 Data Flow & System Behavior
 
@@ -137,8 +226,8 @@ flowchart TD
     Provider((Service Provider))
     PaymentGateway((Payment Gateway))
     
-    subgraph Osiris System
-        System[Osiris MVC Application]
+    subgraph stayFly System
+        System[stayFly MVC Application]
     end
 
     Traveler -- 1. Search Requests --> System
@@ -291,7 +380,7 @@ The interface layout follows a modular design implemented through ASP.NET Core R
 flowchart TD
     Client[Client Browser] -->|HTTPS Port 443| AppService[Azure App Service]
     
-    subgraph CoreApplication [Osiris Core Application]
+    subgraph CoreApplication [stayFly Core Application]
         Auth[Auth & Session Middleware] --> Controllers[Controllers Layer]
         Controllers --> Hotel[Hotel Domain Module]
         Controllers --> Airline[Airline Domain Module]
@@ -312,17 +401,17 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    subgraph Client Device
+    subgraph ClientDevice [Client Device]
         Browser[Browser / Mobile]
     end
     
-    subgraph Microsoft Azure Cloud
-        App[Azure App Service - Osiris Web App MVC]
-        DB[(Azure SQL Server - Osiris_Prod_DB)]
+    subgraph AzureEnvironment [Microsoft Azure Cloud]
+        App[Azure App Service Web App]
+        DB[(Azure SQL Server stayFly_Prod_DB)]
     end
 
     Browser -->|Secure HTTPS Connection| App
-    App -->|ADO.NET / EF Core| DB
+    App -->|ADO.NET and EF Core| DB
 
 ```
 
@@ -352,5 +441,3 @@ The deployment process is highly automated to ensure zero-downtime rollouts:
 2. **CI/CD Pipeline:** Configured using **GitHub Actions**. Upon merging a Pull Request into the `main` branch, the workflow automatically restores dependencies, builds the project, and executes unit tests.
 3. **Azure App Service Deployment:** If tests pass, the compiled artifact is automatically pushed to the **Azure App Service** instance.
 4. **Database Migrations:** Entity Framework Core migrations (`Update-Database`) are applied securely to the live **Azure SQL Database** during the deployment pipeline to keep the schema synchronized with the application models.
-
-```
