@@ -1,0 +1,7 @@
+﻿@Osiris_HostAddress = http://localhost:5210
+
+GET {{Osiris_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
